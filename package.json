@@ -1,0 +1,19 @@
+{
+  "name": "srankcrazy-rmmv-plugins",
+  "description": "Typescript source for S Rank Crazy's RPG Maker MV plugins.",
+  "version": "1.0.0",
+  "author": {
+    "name": "S Rank Crazy"
+  },
+  "devDependencies": {
+    "gulp": "^3.9.1",
+    "gulp-concat": "^2.6.1",
+    "gulp-flatmap": "^1.0.0",
+    "gulp-tslint": "^7.1.0",
+    "gulp-typescript": "^3.1.5",
+    "gulp-util": "^3.0.8",
+    "require-dir": "^0.3.1",
+    "tslint": "^4.5.1",
+    "typescript": "^2.2.1"
+  }
+}

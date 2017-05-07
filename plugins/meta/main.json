@@ -1,0 +1,16 @@
+{
+	"name": "main",
+	"name_internal": "Main",
+	"description": "main desc",
+	"version": {
+		"release": "1.0.0",
+		"develop": "1.0.0"
+	},
+	"changelog": [{
+		"version": "1.0.0",
+		"date": "2017-03-11",
+		"fixes": [],
+		"features": [],
+		"notes": []
+	}]
+}
