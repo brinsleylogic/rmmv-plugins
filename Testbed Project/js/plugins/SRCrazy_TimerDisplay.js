@@ -1,6 +1,13 @@
 //=============================================================================
 // SRCrazy_TimerDisplay.js
 //=============================================================================
+//
+// DEPENDENCIES:
+// 
+// SRCrazy_Core
+// SRCrazy_Timer
+//
+//=============================================================================
 
 /*:
  * @author S_Rank_Crazy
@@ -29,6 +36,10 @@
  * @param Global destroy function
  * @desc Adds a function for destroying a timer to the global scope with the specified name
  * @default destroyTimer
+ * 
+ * @param Global check function
+ * @desc Adds a function for checking the existence of a timer to the global scope with the specified name
+ * @default doesTimerExist
  * 
  * @param 
  * 
@@ -134,7 +145,7 @@
  * 
  * MVCommons supported but not required for use.
  * 
- *============================================================================
+ * ============================================================================
  * USAGE
  * 
  * The TimerDisplay can be set up in the Plugin Manager to be configured in
@@ -286,18 +297,18 @@
  * These are also set up in the SCRIPT CALL section of the Plugin PArameters
  * section of the Plugin Manager.
  * 
- *============================================================================
+ * ============================================================================
  * TERMS OF USE
  * 
  * Free for commercial and non-commercial use. No credit need be given, but
  * always appreciated.
  * 
- *============================================================================
+ * ============================================================================
  * COMPATIBILITY
  * 
  * Requires SRCrazy_Core and SRCrazy_Timer plugins.
  * 
- *============================================================================
+ * ============================================================================
  */
 
 SRCrazy.Plugins.TimerDisplay = (function() {
@@ -473,6 +484,23 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 
 	var superClass = Sprite;
 
+	function createImage(path) {
+		var bitmap = new Bitmap(this._dimensions.x, this._dimensions.y);
+		var img = new Sprite(bitmap);
+
+		ImageManager.loadNormalBitmap("img/" + path + ".png")
+			.addLoadListener(function(bmp) {
+				$core.ImageUtil.sampleBitmap(bitmap, bmp, {
+					x: 0,
+					y: 0,
+					width: bitmap.width,
+					height: bitmap.height
+				});
+			});
+
+		return img;
+	}
+
 	function Display(width, height) {
 		superClass.prototype.initialize.call(this, new Bitmap(width, height));
 
@@ -574,11 +602,7 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 	 * Destroys this dsplay and components.
 	 */
 	_p.destroy = function() {
-		if (this.parent) {
-			this.parent.removeChild(this);
-		}
-
-		this.removeChildren();
+		superClass.prototype.destroy.call(this, { children: true });
 
 		this._window = undefined;
 		this._bar = undefined;
@@ -593,23 +617,6 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 		
 		this._bar.setScale(this._timer.currentTime / this._timer.duration);
 	};
-
-	function createImage(path) {
-		var bitmap = new Bitmap(this._dimensions.x, this._dimensions.y);
-		var img = new Sprite(bitmap);
-
-		ImageManager.loadNormalBitmap("img/" + path + ".png")
-			.addLoadListener(function(bmp) {
-				$core.ImageUtil.sampleBitmap(bitmap, bmp, {
-					x: 0,
-					y: 0,
-					width: bitmap.width,
-					height: bitmap.height
-				});
-			});
-
-		return img;
-	}
 	
 
 	//=========================================================================
@@ -717,6 +724,17 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 	}
 
 	/**
+	 * Draws/redraws all timers when Map or Battle scenes are loaded.
+	 */
+	function drawAllTimers() {
+		var i = _timers.length;
+
+		while (i-- > 0) {
+			this.addWindow(_timers[i].display);
+		}
+	}
+
+	/**
 	 * Override SceneManager.update so we can pause timer's during scene changes, etc...
 	 */
 	var SceneManager_update = SceneManager.update;
@@ -742,17 +760,6 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 			}
 		}
 	};
-
-	/**
-	 * Draws/redraws all timers when Map or Battle scenes are loaded.
-	 */
-	function drawAllTimers() {
-		var i = _timers.length;
-
-		while (i-- > 0) {
-			this.addWindow(_timers[i].display);
-		}
-	}
 
 	var Battle_redraw = Scene_Battle.prototype.createAllWindows;
 	Scene_Battle.prototype.createAllWindows = function() {
@@ -788,7 +795,7 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 		window[name] = globalFunction;
 	}
 
-	$core.registerPlugin(plugin, "SRCrazy_TimerDisplay", "1.0", "2018-08-27", true, ["SRCrazy_Core", "SRCrazy_Timer"]);
+	$core.registerPlugin(plugin, "SRCrazy_TimerDisplay", "1.0", "2018-08-28", true, ["SRCrazy_Core", "SRCrazy_Timer"]);
 	
 	var _params = $core.parseParameters(plugin);
 
@@ -974,6 +981,17 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 		}
 	};
 
+	/**
+	 * Indicates whether or not a timer exists with the supplied name.
+	 * 
+	 * @param {string} timerName Name of the timer to check
+	 */
+	plugin.exists = function(timerName) {
+		var timer = _lookup[timerName];
+		return !!timer;
+	};
+
+	// Set up the SHF for creation.
 	if (_params["Shorthand function"] && _params["Shorthand function parameters"]) {
 		var paramList = _params["Shorthand function parameters"]
 			.replace(/[\s,]+/g, ",")
@@ -1004,6 +1022,10 @@ SRCrazy.Plugins.TimerDisplay = (function() {
 
 	if (_params["Global destroy function"]) {
 		addGlobalFunction("Global destroy function", plugin.destroy);
+	}
+
+	if (_params["Global check function"]) {
+		addGlobalFunction("Global check function", plugin.exists);
 	}
 
 	return plugin;

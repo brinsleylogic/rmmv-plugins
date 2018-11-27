@@ -16,6 +16,10 @@ var SRCrazy = SRCrazy || { Plugins: {},  Classes: {} };
  * 
  * ============================================================================
  * 
+ * @param Debug Plugins
+ * @desc Logs plugins registered via this plugin, MVCommons or similar convention to the javascrit console
+ * @default false
+ * 
  * @param Cache Event Commands
  * @desc Caches event commands when queried, speeds up repeated retrieval processes
  * @default true
@@ -38,13 +42,13 @@ var SRCrazy = SRCrazy || { Plugins: {},  Classes: {} };
  * 
  * MVCommons supported but not required for use.
  * 
- *============================================================================
+ * ============================================================================
  * TERMS OF USE
  * 
  * Free for commercial and non-commercial use. No credit need be given, but
  * always appreciated.
  * 
- *============================================================================
+ * ============================================================================
  */
 
 /**
@@ -54,6 +58,7 @@ SRCrazy.Plugins.Core = (function() {
 	"use strict";
 
 	var _p = {};
+	var _registeredPlugins = {};
 	
 	/**
 	 * Override the SceneMAnager's onError method to allow printing contextual data to the console.
@@ -221,11 +226,26 @@ SRCrazy.Plugins.Core = (function() {
 		
 		if (!plugin) {
 			this.throwError("SRCrazy_Core", "Trying to register plugin " + alias + " but not found in plugin list.", $plugins);
+			return;
 		}
 		
 		// If we need parameters, make sure we have them
 		if (requireParameters && plugin.parameters.length === 0) {
 			this.throwError("SRCrazy_Core", "Couldn't find parameters for plugin:" + alias);
+			return;
+		}
+	
+		// Check dependencies
+		if (typeof dependencies === "string") {
+			dependencies = [dependencies];
+		}
+
+		if (dependencies) {
+			for (var i = 0, l = dependencies.length; i < l; i++) {
+				if (!dependencies[i].indexOf("SRCrazy") === 0 && !this.checkDependency(dependencies[i], alias)) {
+					return;
+				}
+			}
 		}
 		
 		// Set plugin variables
@@ -237,6 +257,8 @@ SRCrazy.Plugins.Core = (function() {
 		};
 		
 		// Register plugin
+		var registered = false;
+
 		if (Imported["MVCommons"] || Imported["PluginManagement"]) {
 			var author = [ {
 				email: "bahamutsblade@hotmail.com",
@@ -255,13 +277,51 @@ SRCrazy.Plugins.Core = (function() {
 			} else if (success === false) {
 				PluginManager.printPlugin(alias)
 				this.throwError("SRCrazy_Core", "Unable to load " + alias + " due to registration failure! Is there another version running?");
+			} else {
+				registered = true;
 			}
 		// Can't register so manually import
 		} else {
 			Imported[alias] = version;
+			registered = true;
+		}
+
+		if (registered) {
+			_registeredPlugins[alias] = $;
 		}
 
 		return this;
+	};
+
+	/**
+	 * Indicates whether the supplied plugin has been registered.
+	 * 
+	 * @param {string | any} plugin 
+	 * @returns {boolean}
+	 */
+	_p.isRegistered = function(plugin) {
+		if (typeof plugin === "string") {
+			return !!_registeredPlugins[plugin];
+		}
+
+		return !!plugin.META_DATA;
+	};
+
+	/**
+	 * Indicates whether dependent plugin has been registered, throws error if not.
+	 * 
+	 * @param {string} dependency Plugin alias
+	 * @param {string} requestee Plugin alias
+	 * @returns {boolean}
+	 */
+	_p.checkDependency = function(dependency, requestee) {
+		if (this.isRegistered(dependency)) {
+			return true;
+		}
+
+		this.throwError(requestee, "Dependency not registered:", dependency);
+
+		return false;
 	};
 
 	/**
@@ -415,10 +475,15 @@ SRCrazy.Plugins.Core = (function() {
 		return this;
 	};
 	
-	_p.registerPlugin(_p, "SRCrazy_Core", "2.0", "2018-08-25", true);
+	_p.registerPlugin(_p, "SRCrazy_Core", "2.0", "2018-11-27", true);
 	_p.parseParameters(_p);
 
 	_p.useCommandCache = _p.getPluginParameter(_p, "Cache Event Commands", true);
+
+	if (_p.getPluginParameter(_p, "Cache Event Commands") === true) {
+		console.log("SRCrazy_Core :: DEBUG :: Plugins regsitered via SRCrazy:", _registeredPlugins);
+		console.log("SRCrazy_Core :: DEBUG :: General convention plugins:", Imported);
+	}
 
 	return _p;
 })();

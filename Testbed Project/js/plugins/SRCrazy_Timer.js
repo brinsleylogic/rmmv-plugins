@@ -1,6 +1,12 @@
 //=============================================================================
 // SRCrazy_Timer.js
 //=============================================================================
+//
+// DEPENDENCIES:
+// 
+// SRCrazy_Core
+//
+//=============================================================================
 
 /*:
  * @author S_Rank_Crazy
@@ -26,7 +32,7 @@
  * 
  * MVCommons supported but not required for use.
  * 
- *============================================================================
+ * ============================================================================
  * USAGE
  * 
  * This plugin provides a Timer class used to delay the execution of function
@@ -47,18 +53,18 @@
  * In the above exmaple, we create a timer that logs "Hello" 5 times, with
  * an interval of 1 second between each function call.
  * 
- *============================================================================
+ * ============================================================================
  * TERMS OF USE
  * 
  * Free for commercial and non-commercial use. No credit need be given, but
  * always appreciated.
  * 
- *============================================================================
+ * ============================================================================
  * COMPATIBILITY
  * 
  * Requires SRCrazy_Core plugin.
  * 
- *============================================================================
+ * ============================================================================
  */
 
 SRCrazy.Classes.Timer = (function() {
@@ -67,7 +73,7 @@ SRCrazy.Classes.Timer = (function() {
 	var $core = SRCrazy.Plugins.Core;
 	var plugin = {};
 
-	$core.registerPlugin(plugin, "SRCrazy_Timer", "1.0", "2018-08-25", false, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_Timer", "1.0", "2018-11-27", false, "SRCrazy_Core");
 
 	/**
 	 * Creates a new Timer.
@@ -93,11 +99,13 @@ SRCrazy.Classes.Timer = (function() {
 	}
 
 	var _p = $core.createClass(Timer);
+	$core.createGetter(Timer, "frameRate", function() { return _frameRate; });
 
 	var _interval;
 	var _lastTime = Date.now();
 	var _timers = [];
 	var _paused = false;
+	var _frameRate;
 
 	/**
 	 * Updates all active Timer instances.
@@ -131,7 +139,8 @@ SRCrazy.Classes.Timer = (function() {
 			clearInterval(_interval);
 		}
 
-		_interval = setInterval(update, 1000 / fps);
+		_frameRate = 1000 / fps;
+		_interval = setInterval(update, _frameRate);
 	};
 
 	/**

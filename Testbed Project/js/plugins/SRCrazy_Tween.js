@@ -1,6 +1,13 @@
 //=============================================================================
 // SRCrazy_Tween.js
 //=============================================================================
+//
+// DEPENDENCIES:
+// 
+// SRCrazy_Core
+// SRCrazy_Timer [Optional]
+//
+//=============================================================================
 
 /*:
  * @author S_Rank_Crazy
@@ -26,7 +33,7 @@
  * 
  * MVCommons supported but not required for use.
  * 
- *============================================================================
+ * ============================================================================
  * USAGE
  * 
  * This plugin provides a Tween class used to animate/tween values of an
@@ -34,6 +41,12 @@
  * found in the SRCrazy global namespace at:
  * 
  * SRCrazy.Classes.Tween
+ * 
+ * There are two ways to use this class:
+ * 1) Manage your own instances.
+ * 2) Fire-and-forget.
+ * 
+ * 1) Managed Instances
  * 
  * To use the class you'll need to first create a new Tween instance, add
  * the desired properties [to be tweened] and manage its state through
@@ -50,22 +63,28 @@
  *     tween.update();
  * });
  * 
- * In the above exmaple, we create a tween to animate the value of property
+ * In the above example, we create a tween to animate the value of property
  * `x` of `targetObject` from 0 to 120, over a duration of 5 seconds. We then
  * call the tween's `update` method on a 1000 millisecond (1 second) interval.
  * 
- *============================================================================
+ * 
+ * 2) Fire-and-Forget
+ * 
+ * This is ashorthand for the above and uses the 
+ * 
+ * ============================================================================
  * TERMS OF USE
  * 
  * Free for commercial and non-commercial use. No credit need be given, but
  * always appreciated.
  * 
- *============================================================================
+ * ============================================================================
  * COMPATIBILITY
  * 
- * Requires SRCrazy_Core plugin.
+ * Requires SRCrazy_Core plugin. Additionally requires SRCrazy_Timer for
+ * self-managed usage.
  * 
- *============================================================================
+ * ============================================================================
  */
 
 SRCrazy.Classes.Tween = (function() {
@@ -74,7 +93,7 @@ SRCrazy.Classes.Tween = (function() {
 	var $core = SRCrazy.Plugins.Core;
 	var plugin = {};
 
-	$core.registerPlugin(plugin, "SRCrazy_Tween", "1.0", "2018-08-25", false, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_Tween", "1.0", "2018-11-27", false, "SRCrazy_Core");
 	
 	/**
 	 * Tween constructor
@@ -239,7 +258,7 @@ SRCrazy.Classes.Tween = (function() {
 	
 	/**
 	 * Updates all the properties in the Tween
-	 * @param {Number} timePassed Time passed since last update
+	 * @param {Number} [timePassed] Time passed since last update
 	 */
 	_p.update = function(timePassed) {
 		var now = new Date().getTime();
@@ -363,4 +382,80 @@ SRCrazy.Classes.Tween = (function() {
 	};
 	
 	return Tween;
+})();
+
+// Adding static shorthand `Tween.to` and self-regulation
+
+(function() {
+	var Tween = SRCrazy.Classes.Tween;
+	var $core = SRCrazy.Plugins.Core;
+	
+	var _tweens = [];
+
+	var _timer;
+	var _hasTimer = false;
+	var _lastTimerUpdate;
+
+	Tween.to = function(target, time, params) {
+		if (!_hasTimer) {
+			if (!$core.checkDependency("SRCrazy_Timer", "SRCrazy_Tween")) {
+				return;
+			}
+
+			_hasTimer = true;
+		}
+
+		var Timer = SRCrazy.Classes.Timer;
+
+		if (!_timer) {
+			_timer = Timer.create(update.bind(this), Timer.frameRate, );
+			_lastTimerUpdate = Date.now();
+		} else if (!_timer.isRunning) {
+			_timer.start();
+			_lastTimerUpdate = Date.now();
+		}
+
+		var tween = new Tween(target, time, params.ease);
+		tween.onCompleteCallback = function() {
+			removeTween(tween);
+		};
+
+		for (var prop in params) {
+			if (prop !== "ease") {
+				tween.addProperty(prop, target[prop], params[prop]);
+			}
+		}
+
+		_tweens.push(tween);
+	};
+
+	/**
+	 * Updates the Tweens.
+	 */
+	function update() {
+		var timeNow = Date.now();
+		var diff = timeNow - _lastTimerUpdate;
+		_lastTimerUpdate = timeNow;
+
+		for (var i = 0, l = _tweens.length; i < l; i++) {
+			_tweens[i].update(diff);
+		}
+	}
+
+	/**
+	 * Removes the supplied tween, manages timer state.
+	 * 
+	 * @param {Tween} tween 
+	 */
+	function removeTween(tween) {
+		var i = _tweens.indexOf(tween);
+
+		if (tween > -1) {
+			_tweens.splice(i, 1);
+		}
+
+		if (!_tweens.length) {
+			_timer.stop();
+		}
+	}
 })();
