@@ -480,7 +480,7 @@ SRCrazy.Plugins.Core = (function() {
 
 	_p.useCommandCache = _p.getPluginParameter(_p, "Cache Event Commands", true);
 
-	if (_p.getPluginParameter(_p, "Cache Event Commands") === true) {
+	if (_p.getPluginParameter(_p, "Debug Plugins") === true) {
 		console.log("SRCrazy_Core :: DEBUG :: Plugins regsitered via SRCrazy:", _registeredPlugins);
 		console.log("SRCrazy_Core :: DEBUG :: General convention plugins:", Imported);
 	}
