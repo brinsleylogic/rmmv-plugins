@@ -50,7 +50,7 @@
 	var $core = SRCrazy.Plugins.Core;
 	var plugin = {};
 
-	$core.registerPlugin(plugin, "SRCrazy_MVAdditions", "1.0", "2018-08-25", false, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_MVAdditions", "1.0.1", "2019-05-26", false, "SRCrazy_Core");
 
 
 	//========================================================================
@@ -248,7 +248,7 @@
 
 
 	Game_Event.prototype._cachedCommandLists = [];
-	Game_Event.prototype._useCommandCache = SRCrazy.Plugins.Core.useCommandCache;
+	Game_Event.prototype._useCommandCache = $core.useCommandCache;
 	
 	/**
 	 * Clears cached commands from event page.
@@ -380,37 +380,48 @@
 	
 	/**
 	 * Retrieves comment tag parameters
-	 * @param {string} parameter Name of parameter
+	 * @param {string} parameterName Name of parameter
 	 * @param {number} [pageIndex] Index of page to search, by default uses event's current page
-	 * @returns {Array} List of parameters
+	 * @returns {string | *} Parameter value
 	 */
-	Game_Event.prototype.getCommentParameter = function(parameter, pageIndex) {
-		var regex = new RegExp('<' + parameter + ': (.*)>', 'i');
+	Game_Event.prototype.getCommentParameter = function(parameterName, pageIndex) {
 		var comments = this.getCommentsOnPage(pageIndex);
+		var regex = new RegExp("<" + parameterName + ": (.*)>", "i");
 
 		var i = comments.length;
 		while (i-- > 0) {
-			var parameters = comments[i].match(regex);
-			if (parameters) {
-				return parameters[1];
+			// Check that it's an acitve comment.
+			var comment = comments[i];
+			
+			if (comment.indexOf("//") !== 0) {
+				var parameters = comment.match(regex);
+				if (parameters) {
+					return $core.parseProperties(parameters[1]);
+				}
 			}
 		}
 	};
 	
 	/**
 	 * Does the passed value exist in a page's comments?
+	 * 
 	 * @param {String} value Name of parameter
 	 * @param {Number} [pageIndex] Index of page to search, by default uses event's current page
-	 * @returns {Array} List of parameters
+	 * @returns {boolean} Indicates whether
 	 */
 	Game_Event.prototype.doesExistInComments = function(value, pageIndex) {
 		var comments = this.getCommentsOnPage(pageIndex);
 
 		var i = comments.length;
 		while (i-- > 0) {
-			var parameters = comments[i].match(value);
-			if (parameters) {
-				return true;
+			// Check that it's an acitve comment.
+			var comment = comments[i];
+
+			if (comment.indexOf("//") !== 0) {
+				var parameters = comment.match(value);
+				if (parameters) {
+					return true;
+				}
 			}
 		}
 		

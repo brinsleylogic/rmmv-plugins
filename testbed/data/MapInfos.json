@@ -4,8 +4,9 @@ null,
 {"id":2,"expanded":true,"name":"Language Primers","order":2,"parentId":0,"scrollX":819,"scrollY":481},
 {"id":3,"expanded":false,"name":"Pause","order":3,"parentId":0,"scrollX":0,"scrollY":0},
 {"id":4,"expanded":false,"name":"Title Screen","order":4,"parentId":0,"scrollX":819,"scrollY":481},
-{"id":5,"expanded":false,"name":"Event Markers","order":5,"parentId":0,"scrollX":819,"scrollY":481},
-{"id":6,"expanded":false,"name":"Event Highlights","order":6,"parentId":0,"scrollX":819,"scrollY":481},
-{"id":7,"expanded":false,"name":"Sort Items","order":7,"parentId":0,"scrollX":819,"scrollY":481},
-{"id":8,"expanded":false,"name":"Map Abilities","order":8,"parentId":0,"scrollX":819,"scrollY":481}
+{"id":5,"expanded":true,"name":"Event Markers","order":5,"parentId":0,"scrollX":819,"scrollY":481},
+{"id":6,"expanded":false,"name":"Event Highlights","order":7,"parentId":0,"scrollX":819,"scrollY":481},
+{"id":7,"expanded":false,"name":"Sort Items","order":8,"parentId":0,"scrollX":819,"scrollY":481},
+{"id":8,"expanded":false,"name":"Map Abilities","order":9,"parentId":0,"scrollX":819,"scrollY":481},
+{"id":9,"expanded":false,"name":"Event Markers - Map Change","order":6,"parentId":5,"scrollX":832,"scrollY":640}
 ]

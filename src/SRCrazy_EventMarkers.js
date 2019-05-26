@@ -870,8 +870,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		return defaults;
 	}
 
-	$core.registerPlugin(plugin, "SRCrazy_EventMarkers", "1.0", "2018-08-28", false, "SRCrazy_Core");
-	$core.registerPlugin(plugin, "SRCrazy_EventMarkers", "1.0", "2018-08-28", false, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_EventMarkers", "1.0.0", "2019-05-26", true, "SRCrazy_Core");
 	$core.addPluginCommands(pluginCommander, ["EventMarkers"]);
 	
 	var _params = $core.parseParameters(plugin);

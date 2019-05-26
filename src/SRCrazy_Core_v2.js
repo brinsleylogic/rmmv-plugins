@@ -11,7 +11,7 @@ var SRCrazy = SRCrazy || { Plugins: {},  Classes: {} };
 
 /*:
  * @author S_Rank_Crazy
- * @plugindesc v2.0 Required for most SRCrazy scripts. Provides some additional functions to standard classes.
+ * @plugindesc v2.0.1 Required for most SRCrazy scripts. Provides some additional functions to standard classes.
  * <SRCrazy_Core>
  * 
  * ============================================================================
@@ -57,8 +57,15 @@ var SRCrazy = SRCrazy || { Plugins: {},  Classes: {} };
 SRCrazy.Plugins.Core = (function() {
 	"use strict";
 
+	var VERSION = "2.0.1";
+	var VERSION_DATE = "2019-05-26";
+
 	var _p = {};
 	var _registeredPlugins = {};
+	/**
+	 * @typedef {{aliases: string[], callback: (command: string, args: string[] }[]}
+	 */
+	var _pluginCommandHandlers = [];
 	
 	/**
 	 * Override the SceneMAnager's onError method to allow printing contextual data to the console.
@@ -71,6 +78,31 @@ SRCrazy.Plugins.Core = (function() {
 			console.error(data);
 		}
 	};
+	
+	var GameInterpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
+	Game_Interpreter.prototype.pluginCommand = function(command, args) {
+		// do we have arguements?
+		if (args && args.length > 0) {
+			var cmd = command.toLowerCase();
+
+			for (let i = 0, l = _pluginCommandHandlers.length; i < l; i++) {
+				var aliases = _pluginCommandHandlers[i].aliases;
+				var handler = _pluginCommandHandlers[i].callback;
+
+				var a = aliases.length;
+				while (a-- > 0) {
+					var alias = aliases[a].toLowerCase();
+					if (alias === cmd) {
+						handler(cmd, args);
+						return;
+					}
+				}
+			}
+		}
+
+		// No arguements passed, we'll just invoke the original method
+		GameInterpreter_pluginCommand(this, command, args);
+	}
 
 	/**
 	 * Throws a game-breaking error and displays the message on screen.
@@ -218,7 +250,7 @@ SRCrazy.Plugins.Core = (function() {
 
 		// search for plugin by alias, this way renaming files isn't problematic
 		var pluginList = $plugins.filter(function(plugin) {
-			return (plugin.description.indexOf('<' + alias + '>') >= 0);
+			return (plugin.description.indexOf("<" + alias + ">") >= 0);
 		});
 		
 		// This is our plugin
@@ -340,38 +372,11 @@ SRCrazy.Plugins.Core = (function() {
 				continue;
 			}
 
-			var value = params[key].toLowerCase();
+			params[key] = this.typeValue(params[key]);
 
-			switch (value) {
-				case "no":
-				case "off":
-				case "false":
-					params[key] = false;
-					break;
-
-				case "yes":
-				case "on":
-				case "true":
-					params[key] = true;
-
-					if (key.toLowerCase() == "debug") {
-						plugin.debugMode = true;
-						this.debugLog(plugin, plugin);
-					}
-					break;
-				
-				default:
-					var nonNumeric = value.match(/[^\d.-x]/);
-					if (!nonNumeric) {
-						var radix = (value[1] === "x" || value[0] === "#") ? 16 : 10;
-						var number = parseInt(value, radix);
-
-						if (!isNaN(number) && isFinite(number)) {
-							params[key] = number;
-						}
-					}
-
-					break;
+			if (params[key] === true && key.toLowerCase() == "debug") {
+				plugin.debugMode = true;
+				this.debugLog(plugin, plugin);
 			}
 		}
 
@@ -383,11 +388,47 @@ SRCrazy.Plugins.Core = (function() {
 	};
 
 	/**
+	 * Returns typed value from supplied string.
+	 * 
+	 * @param {string} value String value to be typed
+	 * @returns {string | number | boolean}
+	 */
+	_p.typeValue = function(value) {
+		switch (value.toLowerCase()) {
+			case "no":
+			case "off":
+			case "false":
+				return false;
+
+			case "yes":
+			case "on":
+			case "true":
+				return true;
+			
+			default:
+				var nonNumeric = value.match(/[^\d\.-x]/);
+
+				if (!nonNumeric) {
+					var radix = (value[1] === "x" || value[0] === "#") ? 16 : 10;
+					var number = parseFloat(value, radix);
+
+					if (!isNaN(number) && isFinite(number)) {
+						return number;
+					}
+				}
+
+				break;
+		}
+
+		return value;
+	}
+
+	/**
 	 * Retrieves a parameter from the supplied plugin.
 	 * 
 	 * @param {*} plugin Plugin to retrieve parameter from
 	 * @param {string} name Parameter name
-	 * @param {*} [defaultValue] If value sin't set, this value is returned
+	 * @param {*} [defaultValue] If value isn't set, this value is returned
 	 */
 	_p.getPluginParameter = function(plugin, name, defaultValue) {
 		var value = plugin.META_DATA.parameters[name];
@@ -411,32 +452,12 @@ SRCrazy.Plugins.Core = (function() {
 	/**
 	 * Allows a plugin to listen for Plugin Commands.
 	 * 
-	 * @param {(string[]) => void} handler The function to call when the command matches a supplied alias
+	 * @param {(command: string, args: string[]) => void} handler The function to call when the command matches a supplied alias
 	 * @param {string[]} aliases Array of aliases to use for the handler to be invoked
 	 * @returns {this}
 	 */
 	_p.addPluginCommands = function(handler, aliases) {
-		var Override_pluginCommand = Game_Interpreter.prototype.pluginCommand;
-
-		Game_Interpreter.prototype.pluginCommand = function(command, args) {
-			// do we have arguements?
-			if (args && args.length > 0) {
-				var cmd = command.toLowercase();
-
-				var i = aliases.length;
-				while (i-- > 0) {
-					var alias = aliases[i].toLowercase();
-					if (alias === cmd) {
-						handler(args);
-						return;
-					}
-				}
-			}
-
-			// No arguements passed, we'll just invoke the original method
-			Override_pluginCommand(this, command, args);
-		}
-
+		_pluginCommandHandlers.push({ aliases, callback: handler });
 		return this;
 	};
 
@@ -474,8 +495,104 @@ SRCrazy.Plugins.Core = (function() {
 
 		return this;
 	};
+
+	/**
+	 * Parses the supplied parameter string.
+	 *
+	 * @param {string} value
+	 */
+	_p.parseProperties = function(value) {
+		if (value.indexOf("<") < 0) {
+			return value;
+		}
+
+		return extractParameters(
+			value.replace(/([\s]+<)/gi, "<")
+			.replace(/([\s]+>)/gi, ">")
+			.replace(/(:[\s]+)/gi, ":")
+			.replace(/([\s]+:[\s]+)/gi, ":")
+		);
+	};
+
+	/**
+	 * Extracts (and strongly types) parameters from supplied string.
+	 *
+	 * @param {string} paramString
+	 * @returns {*} Parsed parameter data
+	 */
+	function extractParameters(paramString) {
+		var structure = paramString.match(/(>)|(<)/gi);
+		var structureIndex = 0;
+		var hierarchy = [];
+
+		var params = paramString.match(/<([\w\s]+):?/gi);
+		var data = {};
+		var target = data;
+
+		var original = paramString;
+		var $core = SRCrazy.Plugins.Core;
+
+		for (let i = 0, l = params.length; i < l; i++) {
+			var endChar = structure[++structureIndex];
+			var waitingForClosure = (endChar === ">");
+			var closedParent = false;
+
+			// Grab the parameter name.
+			var key = params[i].replace(/[<:]/gi, "");
+
+			// We're closing this paramter, do the assignment.
+			if (waitingForClosure) {
+				// Get the value.
+				var value = paramString.substring(
+					params[i].length,
+					paramString.indexOf( (waitingForClosure) ? ">" : "<")
+				);
+
+				// This is a boolean tag.
+				if (value.length === 0) {
+					target[key] = true;
+					
+				// Tag has a value set.
+				} else {
+					target[key] = $core.typeValue(value);
+				}
+
+				// We're closing this object, remove from hierarchy.
+				if (structure[++structureIndex] === ">") {
+					target = hierarchy.pop();
+					closedParent = true;
+					++structureIndex;
+				}
+
+			// We're opening a new object.
+			} else {
+				var newObject = {};
+				target[key] = newObject;
+				hierarchy.push(target);
+
+				target = newObject;
+			}
+
+			// Remove processed data from string.
+			var search = params[i];
+			if (waitingForClosure) {
+				search += value + ">";
+			}
+			if (closedParent) {
+				search += ">";
+			}
+
+			paramString = paramString.replace(search, "");
+		}
+
+		if (paramString) {
+			console.warn("Game_Event.getCommentParameter :: Malformatted parameters:", original);
+		}
+
+		return data;
+	}
 	
-	_p.registerPlugin(_p, "SRCrazy_Core", "2.0", "2018-11-27", true);
+	_p.registerPlugin(_p, "SRCrazy_Core", VERSION, VERSION_DATE, true);
 	_p.parseParameters(_p);
 
 	_p.useCommandCache = _p.getPluginParameter(_p, "Cache Event Commands", true);
@@ -497,7 +614,7 @@ SRCrazy.Plugins.Core.ImageUtil = (function() {
 		 * Retrieves Bitmap from source folder.
 		 * 
 		 * @param {string} filename Name of image file to retrieve
-		 * @param {string} [path=system] Folder path from inside project's img folder, defaults to 'system'
+		 * @param {string} [path=system] Folder path from inside project's img folder, defaults to "system"
 		 * @param {number} [hue] Hue value for the image
 		 * @returns {Bitmap}
 		 */
@@ -519,7 +636,7 @@ SRCrazy.Plugins.Core.ImageUtil = (function() {
 		 * @param {Bitmap} bitmap Bitmap to draw image in to
 		 * @param {Rect} sampleRect Rect that defines what area of the source image to draw
 		 * @param {string} filename Name of image file to retrieve
-		 * @param {string} [filePath=system] Folder path from inside project's img folder, defaults to 'system'
+		 * @param {string} [filePath=system] Folder path from inside project's img folder, defaults to "system"
 		 * @param {number} [hue] Hue value for the image
 		 * @returns {Bitmap}
 		 */
@@ -534,11 +651,12 @@ SRCrazy.Plugins.Core.ImageUtil = (function() {
 		},
 	   
 		/**
-		 * Draws section of source image to Bitmap object based on a uniform spacing index
+		 * Draws section of source image to Bitmap object based on a uniform spacing index.
+		 * 
 		 * @param {Bitmap} bitmap Bitmap to draw image in to
 		 * @param {number} index Index of image in source
 		 * @param {string} filename Name of image file to retrieve
-		 * @param {string} [filePath=system] Folder path from inside project's img folder, defaults to 'system'
+		 * @param {string} [filePath=system] Folder path from inside project's img folder, defaults to "system"
 		 * @param {number} [hue] Hue value for the image
 		 */
 		blitToBitmap: function(bitmap, index, filename, filePath, hue) {
@@ -552,7 +670,7 @@ SRCrazy.Plugins.Core.ImageUtil = (function() {
 			drawRect.width = w;
 			drawRect.height = h;
 			
-			drawImageToBitmap(bitmap, drawRect, filename, filePath, hue);
+			this.drawImageToBitmap(bitmap, drawRect, filename, filePath, hue);
 		},
 
 		/**
@@ -565,7 +683,6 @@ SRCrazy.Plugins.Core.ImageUtil = (function() {
 		 */
 		sampleBitmap: function(target, source, sampleRect) {
 			source.addLoadListener(function() {
-				console.log("Blit this shiz");
 				target.blt(source, sampleRect.x, sampleRect.y, sampleRect.width, sampleRect.height, 0, 0);
 			});
 
