@@ -58,7 +58,7 @@ SRCrazy.Plugins.Core = (function() {
 	"use strict";
 
 	var VERSION = "2.0.1";
-	var VERSION_DATE = "2019-05-26";
+	var VERSION_DATE = "2019-06-02";
 
 	var _p = {};
 	var _registeredPlugins = {};
@@ -510,7 +510,8 @@ SRCrazy.Plugins.Core = (function() {
 			value.replace(/([\s]+<)/gi, "<")
 			.replace(/([\s]+>)/gi, ">")
 			.replace(/(:[\s]+)/gi, ":")
-			.replace(/([\s]+:[\s]+)/gi, ":")
+			.replace(/([\s]+:)/gi, ":")
+			.replace(/([\s\t]+$)/gi, "")
 		);
 	};
 
@@ -525,7 +526,7 @@ SRCrazy.Plugins.Core = (function() {
 		var structureIndex = 0;
 		var hierarchy = [];
 
-		var params = paramString.match(/<([\w\s]+):?/gi);
+		var params = paramString.match(/<!?([\w\s]+):?/gi);
 		var data = {};
 		var target = data;
 
@@ -535,33 +536,40 @@ SRCrazy.Plugins.Core = (function() {
 		for (let i = 0, l = params.length; i < l; i++) {
 			var endChar = structure[++structureIndex];
 			var waitingForClosure = (endChar === ">");
-			var closedParent = false;
+			var closureTag = "";
 
 			// Grab the parameter name.
 			var key = params[i].replace(/[<:]/gi, "");
+			var value;
 
 			// We're closing this paramter, do the assignment.
 			if (waitingForClosure) {
-				// Get the value.
-				var value = paramString.substring(
-					params[i].length,
-					paramString.indexOf( (waitingForClosure) ? ">" : "<")
-				);
+				// This is a boolean tag: false.
+				if (key.indexOf("!") === 0) {
+					key = key.substr(1, key.length);
+					value = "";
+					target[key] = false;
 
-				// This is a boolean tag.
-				if (value.length === 0) {
+				// This is a boolean tag: true.
+				} else if (params[i].indexOf(":") < 0) {
 					target[key] = true;
+					value = "";
 					
 				// Tag has a value set.
 				} else {
+					// Get the value.
+					value = paramString.substring(
+						params[i].length,
+						paramString.indexOf( (waitingForClosure) ? ">" : "<")
+					);
+
 					target[key] = $core.typeValue(value);
 				}
 
 				// We're closing this object, remove from hierarchy.
-				if (structure[++structureIndex] === ">") {
+				while (structure[++structureIndex] === ">") {
 					target = hierarchy.pop();
-					closedParent = true;
-					++structureIndex;
+					closureTag += ">";
 				}
 
 			// We're opening a new object.
@@ -578,15 +586,12 @@ SRCrazy.Plugins.Core = (function() {
 			if (waitingForClosure) {
 				search += value + ">";
 			}
-			if (closedParent) {
-				search += ">";
-			}
 
-			paramString = paramString.replace(search, "");
+			paramString = paramString.replace(search + closureTag, "");
 		}
 
 		if (paramString) {
-			console.warn("Game_Event.getCommentParameter :: Malformatted parameters:", original);
+			console.warn("Game_Event.getCommentParameter :: Malformatted parameters:", original, data);
 		}
 
 		return data;

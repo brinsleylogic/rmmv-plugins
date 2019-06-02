@@ -11,7 +11,7 @@
 
 /*:
  * @author S_Rank_Crazy
- * @plugindesc v1.0 Provides a means to display/manage icons above events.
+ * @plugindesc v2.0.0 Provides a means to display/manage icons above events.
  * <SRCrazy_EventMarkers>
  * 
  * @param Disabled At Start
@@ -50,33 +50,68 @@
  * @desc Parameters in this section relate to the general appearance
  * 
  * @param X Offset
- * @desc The offset used to displaying icon above the event
+ * @desc The offset used to displaying marker above the event
  * default: 0
  * @default 0
  * 
  * @param Y Offset
- * @desc The offset used to displaying icon above the event
+ * @desc The offset used to displaying marker above the event
  * default: -38
  * @default -38
  * 
+ * @param Scale
+ * @desc Controls the scale of marker
+ * default: 1
+ * @default 1
+ * 
  * @param Opacity
- * @desc Sets the alpha of the indicators
+ * @desc Sets the alpha of the marker
  * default: 255
  * @default 255
+ * 
+ * @param Hue
+ * @desc Applies a hue shift to the marker
+ * default: 0
+ * @default 0
  * 
  * @param Layer Order
  * @desc Controls whether indicator appears over/under map objects
  * default: 5
  * @default 5
  * 
- * @param Scale
- * @desc Controls the scale of indicators
- * default: 1
+ * @param
+ * 
+ * @param -- Tween Settings --
+ * @desc Parameters in this section relate to tween properties
+ * 
+ * @param Enable Default Tween
+ * @desc Is the default tween (set up here) enabled for Event Markers?
+ * default: false
+ * @default false
+ * 
+ * @param Tween Time
+ * @desc The time it takes for the tween to complete
+ * (see help for more information)
+ * @default 0
+ * 
+ * @param Tween X Offset
+ * @desc Properties for tweening marker's x position
+ * (see help for more information)
+ * @default 0
+ * 
+ * @param Tween Y Offset
+ * @desc Properties for tweening marker's y position
+ * (see help for more information)
+ * @default -48
+ * 
+ * @param Tween Scale
+ * @desc Properties for tweening marker's scale on x-axis
+ * (see help for more information)
  * @default 1
  * 
- * @param Hue
- * @desc Applies a hue shift to the icon
- * default: 0
+ * @param Tween Opacity
+ * @desc Properties for tweening marker's ocpacity
+ * (see help for more information)
  * @default 0
  * 
  * ============================================================================
@@ -103,6 +138,48 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	//=========================================================================
 	// Marker Controller
 	//=========================================================================
+
+	/**
+	 * Creates new marker and sprite (if enabled).
+	 *
+	 * @param {Game_Event} event
+	 * @param {MarkerData} data
+	 */
+	function MarkerController(event, data) {
+		this._active;
+
+		/**
+		 * @typedef {Game_Event} Event being tracked by this marker.
+		 */
+		this._event;
+
+		/**
+		 * @typedef {MarkerData} Data used for sprite component.
+		 */
+		this._data;
+
+		/**
+		 * @typedef {Sprite_Marker} The sprite for this marker.
+		 */
+		this._sprite;
+
+		/**
+		 * @typedef {number} ID where this marker exists.
+		 */
+		this.mapId = event._mapId;
+		
+		/**
+		 * @typedef {string} Name of marker.
+		 */
+		this.name = getMarkerName(event);
+
+		// Upadted internal state.
+		this.refresh(event, data);
+		
+		if (data.debug) {
+			debug(this);
+		}
+	}
 
 	/**
 	 * Updates object `a` with the values from object `b`.
@@ -140,17 +217,20 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		while (i-- > 0) {
 			var key = keys[i];
 
-			// Fill in missing values.
-			if (a[key] == null) {
-				if (typeof b[key] === "object") {
-					fillMissing(a[key], b[key], true);
-				} else {
-					a[key] = b[key];
+			// Don't update enabled if we have a trigger.
+			if (key !== "enabled" || !a.trigger) {
+				// Fill in missing values.
+				if (a[key] == null) {
+					if (typeof b[key] === "object") {
+						fillMissing(a[key], b[key], true);
+					} else {
+						a[key] = b[key];
+					}
+				
+				// Search for sub values if this is an object.
+				} else if (typeof a[key] === "object") {
+					fillMissing(a[key], b[key]);
 				}
-			
-			// Search for sub values if this is an object.
-			} else if (typeof a[key] === "object") {
-				fillMissing(a[key], b[key]);
 			}
 		}
 	}
@@ -168,48 +248,98 @@ SRCrazy.Plugins.EventMarkers = (function() {
 			message = "";
 		}
 
-		console.log("EventMarker :: DEBUG" + message, marker._event.event().name, marker, marker._data, marker._sprite);
+		console.warn("EventMarker :: DEBUG" + message, marker._event.event().name, marker, marker._data, marker._sprite);
 	}
 
 	/**
-	 * Creates new marker and sprite (if enabled).
+	 * Sets the enabled state based on the data's trigger.
 	 *
-	 * @param {Game_Event} event
 	 * @param {MarkerData} data
+	 * @returns {boolean} Indicates whether the trigger changed the state
 	 */
-	function MarkerController(event, data) {
-		/**
-		 * @typedef {Game_Event} Event being tracked by this marker.
-		 */
-		this._event;
+	function checkTrigger(data) {
+		if (!data.trigger) {
+			return;
+		}
 
-		/**
-		 * @typedef {MarkerData} Data used for sprite component.
-		 */
-		this._data;
+		var enabled;
+		var targetValue;
 
-		/**
-		 * @typedef {Sprite_Marker} The sprite for this marker.
-		 */
-		this._sprite;
+		if (data.trigger.type === "switch") {
+			targetValue = $gameSwitches.value(data.trigger.triggerId);
+		} else if (data.trigger.type === "variable") {
+			targetValue = $gameVariables.value(data.trigger.triggerId);
+		} else {
+			return;
+		}
 
-		/**
-		 * @typedef {number} ID where this marker exists.
-		 */
-		this.mapId = event._mapId;
-		
-		/**
-		 * @typedef {string} Name of marker.
-		 */
-		this.name = getMarkerName(event);
+		enabled = (targetValue === data.trigger.value);
 
-		// Upadted internal state.
-		this.refresh(event, data);
-		
-		if (data.debug) {
-			debug(this);
+		if (data.enabled !== enabled) {
+			data.enabled = enabled;
+			data.trigger.changed = true;
+			return true;
 		}
 	}
+
+	/**
+	 * Adds/updates/removes trigger and checks state.
+	 *
+	 * @param {MarkerController} marker
+	 * @param {boolean} kill
+	 */
+	function manageTrigger(marker, kill) {
+		if (marker._data.trigger) {
+			checkTrigger(marker._data);
+
+			var trigger = marker._data.trigger;
+			
+			if (trigger.type === "switch") {
+				var list = _switchTriggers[trigger.triggerId];
+				if (!list) {
+					_switchTriggers[trigger.triggerId] = list = []
+				}
+			} else if (trigger.type === "variable") {
+				var list = _variableTriggers[trigger.triggerId];
+				if (!list) {
+					_variableTriggers[trigger.triggerId] = list = []
+				}
+			}
+
+			// Remove the trigger.
+			if (kill) {
+				delete marker._data["trigger"];
+			
+				var i = list.length;
+				while (i-- > 0) {
+					if (list[i].markerId === trigger.markerId) {
+						list.splice(i, 1);
+						break;
+					}
+				}
+			
+			// Register the trigger.
+			} else {
+				var addTrigger = true;
+				var i = list.length;
+
+				while (i-- > 0) {
+					// Check for updating the trigger.
+					if (list[i].markerId === trigger.markerId) {
+						addTrigger = false;
+						list[i].trigger = trigger;
+						break;
+					}
+				}
+
+				// Add it if not found.
+				if (addTrigger) {
+					list.push(trigger);
+				}
+			}
+		}
+	}
+
 
 	var _p = $core.createClass(MarkerController);
 
@@ -225,18 +355,23 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	_p.refresh = function(event, data) {
 		this._event = event;
 
-		if (this._data) {
-			updateData(this._data, data);
-		} else {
-			this._data = data;
-			fillMissing(data, _defaultValues);
+		var killTrigger = (data && data.enabled != null && data.trigger == null);
+
+		if (data) {
+			if (this._data) {
+				updateData(this._data, data);
+			} else {
+				this._data = data;
+				fillMissing(data, _defaultValues);
+			}
 		}
 
-		if (this._data.enabled) {
-			if (!this.sprite) {
-				var sprite = new Sprite_Marker(event, this._data);
-				this._sprite = sprite;				
-			}
+		// Handle triggers.
+		manageTrigger(this, killTrigger);
+
+		if (this._data.enabled && !this.sprite) {
+			var sprite = new Sprite_Marker(event, this._data);
+			this._sprite = sprite;				
 		}
 
 		if (this._validated) {
@@ -275,6 +410,12 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	 * @memberof MarkerController
 	 */
 	_p.activate = function() {
+		if (this._active) {
+			return;
+		}
+
+		this._active = true;
+
 		if (this._data.debug) {
 			debug(this, "Activated");
 		}
@@ -294,6 +435,12 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	 * @memberof MarkerController
 	 */
 	_p.deactivate = function() {
+		if (!this._active) {
+			return;
+		}
+
+		this._active = false;
+
 		if (this._data.debug) {
 			debug(this, "Deactivated");
 		}
@@ -324,22 +471,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	//=========================================================================
 
 	var _tileMap;
-	
-	/**
-	 * Get reference for parent TileMap.
-	 */
-	var SpritesetMap_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
-	Spriteset_Map.prototype.createLowerLayer = function() {
-		SpritesetMap_createLowerLayer.call(this);
-		
-		_tileMap = this._tilemap;
-
-		var i = _markers.length;
-		while (i-- > 0) {
-			_markers[i].validate();
-		}
-	};
-
+	var _hasTween;
 
 	/**
 	 * Creates new sprite usingg supplied data.
@@ -353,17 +485,56 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		
 		this._mapId = event._mapId;
 		this._event = event;
+
+		this.name = event.event().name;
 		
 		this.anchor.set(0.5, 1);
 		
 		this._tweens = [];
 		this._tweenCount = 0;
 		
-		// Used for built-in tweens
+		/** @typedef {{ [name: string]: Tween }} */
 		this._tweenLookup = {};
-		
-		this.updateState(data);
 	};
+	
+	/**
+	 * Updates the position of the marker.
+	 * 
+	 * @param {Sprite_Marker} sprite
+	 */
+	function updatePosition(sprite) {
+		sprite.x = sprite._event.screenX() + sprite._offsetX;
+		sprite.y = sprite._event.screenY() + sprite._offsetY;
+	}
+	
+	/**
+	 * Sets up tweens for the marker ugint he supplied data.
+	 * 
+	 * @param {Sprite_Marker} sprite
+	 * @param {MarkerData} data
+	 */
+	function processTweenData(sprite, data) {
+		if (_hasTween == null) {
+			if (!checkTweenDependency()) {
+				return;
+			}
+		} else if (!_hasTween) {
+			return;
+		}
+
+		var lookup = sprite._tweenLookup;
+		var tweens = sprite._tweens;
+
+		console.log(data);
+
+		// Remove old tweens that either no longer exist or need to be updated.
+
+
+		// Add new/updated tweens.
+		var keys = Object.keys(data);
+
+	}
+
 
 	var _p = $core.createClass(Sprite_Marker, Sprite_Base.prototype);
 
@@ -393,7 +564,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	_p.hide = function() {
 		var doUpdate = !this._hiding;
 		
-		Sprite_Base.prototype.show.call(this);
+		Sprite_Base.prototype.jode.call(this);
 		
 		if (doUpdate) {
 			var i = this._tweenCount;
@@ -417,16 +588,19 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		this.opacity = data.opacity;
 		this.z = data.layer;
 		
-		this._offsetX = data.offset.x;
-		this._offsetY = data.offset.y;
-		
 		this.scale.x = data.scale.x;
 		this.scale.y = data.scale.y;
 		
-		this.updatePosition();
+		if (this._offsetX !== data.offset.x || this._offsetY !== data.offset.y) {
+			this._offsetX = data.offset.x;
+			this._offsetY = data.offset.y;
 
-		// TODO Implement tweening.
-		// this.createTweens(data);
+			updatePosition(this);
+		}
+		
+		if (data.tween != null) {
+			processTweenData(this, data.tween);
+		}
 	};
 	
 	/**
@@ -442,18 +616,87 @@ SRCrazy.Plugins.EventMarkers = (function() {
 			return;
 		}
 		
-		this.updatePosition();
-		// this.updateTweens();
+		updatePosition(this);
+		
+		var i = this._tweenCount;
+		while (i-- > 0) {
+			this._tweens[i].update();
+		}
 	};
+
+	// Tweens
 	
 	/**
-	 * Updates the position of the marker.
-	 * 
-	 * @memberof Sprite_Marker
+	 * Checks dependency on Tween class. If found, initialises `SpriteTween`.
+	 *
+	 * @returns {boolean}
 	 */
-	_p.updatePosition = function() {
-		this.x = this._event.screenX() + this._offsetX;
-		this.y = this._event.screenY() + this._offsetY;
+	function checkTweenDependency() {
+		if (!$core.checkDependency("SRCrazy_Tween", "SRCrazy_EventMarkers")) {
+			_hasTween = false;
+			return false;
+		}
+
+		_hasTween = true;
+		
+
+		$core.createClass(SpriteTween, SRCrazy.Classes.Tween.prototype);
+
+		return true;
+	}
+
+
+	function TweenData() {
+		/** @typedef {number} */
+		this.time;
+
+		/** @typedef {boolean} */
+		this.enabled;
+
+		/** @typedef {number} */
+		this.opacity;
+		/** @typedef {number} */
+		this.layer;
+		/** @typedef {number} */
+		this.hue;
+
+		/** @typedef {{ x: number, y: number }} */
+		this.offset = {};
+
+		/** @typedef {{ x: number, y: number }} */
+		this.scale = {};
+	}
+
+	/**
+	 * Creates a new `SpriteTween` instance.
+	 *
+	 * @param {*} target The object whose properties the Tween will update
+	 * @param {TweenData} data Data used to create the tween
+	 */
+	function SpriteTween(target, data) {
+		/** @typedef {Tween} */
+		this._tween;
+
+		/**
+		 * @typedef {MarkerData}
+		 */	
+		this._propertyNames = [];
+	}
+
+
+	/**
+	 * Get reference for parent TileMap.
+	 */
+	var SpritesetMap_createLowerLayer = Spriteset_Map.prototype.createLowerLayer;
+	Spriteset_Map.prototype.createLowerLayer = function() {
+		SpritesetMap_createLowerLayer.call(this);
+		
+		_tileMap = this._tilemap;
+
+		var i = _markers.length;
+		while (i-- > 0) {
+			_markers[i].validate();
+		}
 	};
 
 
@@ -491,9 +734,48 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	var _commentTag = "marker";
 
 	/**
+	 * Used for enabling/disabling markers based on Switches.
+	 * 
+	 * @typedef {{ [switchId: number]: MarkerTrigger[] }}
+	 */
+	var _switchTriggers = {};
+
+	/**
+	 * Used for enabling/disabling markers based on Variables.
+	 * 
+	 * @typedef {{ [variableId: number]: MarkerTrigger[] }}
+	 */
+	var _variableTriggers = {};
+
+	/**
+	 * Class structure for the data used to detail a variable trigger.
+	 *
+	 * @param {string} markerId
+	 * @param {number} triggerId
+	 * @param {boolean | number} value
+	 */
+	function MarkerTrigger(markerId, triggerId, value) {
+		this.markerId = markerId;
+		this.triggerId = triggerId;
+		this.value = value;
+
+		if (typeof value === "boolean") {
+			this.type = "switch";
+		} else {
+			this.type = "variable";
+		}
+	}
+
+	$core.createClass(MarkerTrigger);
+
+
+	/**
 	 * Class structure for the data used to define markers.
 	 */
 	function MarkerData() {
+		/** @typedef {MarkerTrigger} */
+		this.trigger,
+
 		/** @typedef {boolean} Is the marker enabled? */
 		this.enabled,
 		/** @typedef {boolean} Are we debugging the marker? */
@@ -513,7 +795,8 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		this.scale = {},
 		this.offset = {},
 
-		this.tween = {};
+		/** @typedef {TweenData} */
+		this.tween;
 	}
 
 	$core.createClass(MarkerData);
@@ -588,9 +871,9 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	function getDataFromEvent(event) {
 		var eventData = event.getCommentParameter(_commentTag);
 
-		
 		if (eventData) {
 			var data = new MarkerData();
+			data.name = getMarkerName(event);
 
 			if (typeof eventData === "string") {
 				getDataFromString(data, eventData);
@@ -619,7 +902,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		 */	
 		var values = string.split(" ");
 
-		data.enabled = (values[0] === "true");
+		processEnableState(data, values[0]);
 		
 		if (values[1] != null) {
 			data.icon.index = values[1];
@@ -647,10 +930,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	function getDataFromParameters(data, params) {
 		data.debug = params.debug;
 
-		// TODO add support to read this from a switch for variable
-		// ?variableId=value
-		// !switchId
-		data.enabled = params.enabled;
+		processEnableState(data, params.enabled);
 
 		// Update icon values.
 		if (typeof params.icon === "number") {
@@ -705,7 +985,66 @@ SRCrazy.Plugins.EventMarkers = (function() {
 			data.hue = params.hue;
 		}
 
-		// TODO Add tween
+		// Update tween value.
+		if (params.tween) {
+			data.tween = {};
+
+			var keys = Object.keys(params.tween);
+			var i = keys.length;
+			
+			while (i-- > 0) {
+				var key = keys[i];
+				data.tween[key] = params.tween[key];
+			}
+
+			fillMissing(data, _defaultTweenVars);
+		} else if (params.tween === false) {
+			data.tween = false;
+		}
+	}
+
+	/**
+	 * Processes the condition for enabling the marker.
+	 *
+	 * @param {MarkerData} data
+	 * @param {bollean | string} value
+	 */
+	function processEnableState(data, value) {
+		if (value == null) {
+			return;
+		}
+
+		if (value === "true") {
+			data.enabled = true;
+			return;
+		}
+
+		if (value === "false") {
+			data.enabled = false;
+			return;
+		}
+
+		if (typeof value === "boolean") {
+			data.enabled = value;
+			return;
+		}
+
+		value = value.replace(/\s+/gi, "");
+
+		// $switchId
+		if (value.indexOf("$") === 0) {
+			var switchId = value.replace(/[$!]/gi, "");
+			value = !(value.indexOf("!") === 1);
+
+			data.trigger = new MarkerTrigger(data.name, switchId, value);
+			
+		// #variableId=value
+		} else if (value.indexOf("#") === 0) {
+			var variableId = value.replace(/#|(=\d+)/gi, "");
+			value = value.replace(/#\d+=]/gi, "");
+
+			data.trigger = new MarkerTrigger(data.name, variableId, $core.typeValue(value));
+		}
 	}
 
 	/**
@@ -716,15 +1055,8 @@ SRCrazy.Plugins.EventMarkers = (function() {
 	 * @returns {MarkerController}
 	 */
 	function addMarker(event, data) {
-		var marker = getMarker(event);
-
-		// Update existing marker
-		if (marker) {
-			marker.refresh(event, data);
-			
-		// Create a new marker
-		} else {
-			marker = new MarkerController(event, data);
+		if (data) {
+			var marker = new MarkerController(event, data);
 
 			_lookup[marker.name] = marker;
 
@@ -734,9 +1066,9 @@ SRCrazy.Plugins.EventMarkers = (function() {
 				_markers = [marker];
 				_markersPerMap[marker.mapId] = _markers;
 			}
-		}
 
-		return marker;
+			return marker;
+		}
 	}
 
 	/**
@@ -758,6 +1090,39 @@ SRCrazy.Plugins.EventMarkers = (function() {
 			}
 		}
 	}
+
+
+	var GameSwitches_setValue = Game_Switches.prototype.setValue;
+	Game_Switches.prototype.setValue = function(switchId, value) {
+		GameSwitches_setValue.call(this, switchId, value);
+
+		var triggers = _switchTriggers[switchId];
+		if (triggers) {
+			var i = triggers.length;
+			
+			while (i-- > 0) {
+				var trigger = triggers[i];
+				var marker = _lookup[trigger.markerId];
+				checkTrigger(marker._data);
+			}
+		}
+	};
+
+	var GameVariables_setValue = Game_Variables.prototype.setValue;
+	Game_Variables.prototype.setValue = function(switchId, value) {
+		GameVariables_setValue.call(this, switchId, value);
+
+		var triggers = _variableTriggers[switchId];
+		if (triggers) {
+			var i = triggers.length;
+			
+			while (i-- > 0) {
+				var trigger = triggers[i];
+				var marker = _lookup[trigger.markerId];
+				checkTrigger(marker._data);
+			}
+		}
+	};
 
 	/**
 	 * Stop processing old map events.
@@ -787,6 +1152,25 @@ SRCrazy.Plugins.EventMarkers = (function() {
 
 		GameMap_setupEvents.call(this);
 	};
+
+	/**
+	 * Checks if `setupPage` should be called, accounting for triggers.
+	 */
+	var GameEvent_refresh = Game_Event.prototype.refresh;
+	Game_Event.prototype.refresh = function() {
+		var newPageIndex = this._erased ? -1 : this.findProperPageIndex();
+		
+		if (this._pageIndex !== newPageIndex) {
+			GameEvent_refresh.call(this);
+			return;
+		}
+
+		// We're on the same page, check for triggers.
+		var marker = getMarker(this);
+		if (marker && marker._data.trigger && marker._data.trigger.changed) {
+			this.setupPage();
+		}
+	};
 	
 	/**
 	 * Ensures markers are assigned their new Game_Event instances to track.
@@ -796,23 +1180,22 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		GameEvent_setupPage.call(this);
 
 		// Funcitonality disabled, hide marker if we have one.
-		if (_isDisabled) {
-			var marker = getMarker(this);
-			if (marker) {
-				marker.refresh(this, data);
-				marker.deactivate();
-			}
-
-			return;
-		}
-
-		// No data in this event, no marker processing required.
 		var data = getDataFromEvent(this);
-		if (!data) {
-			return;
-		}
+		var marker = getMarker(this);
 
-		addMarker(this, data);
+		if (marker) {
+			marker.refresh(this, data);
+
+			if (_isDisabled) {
+				marker.deactivate();
+				
+				if (marker._data.trigger) {
+					marker._data.trigger.changed = false;
+				}
+			}
+		} else if (data) {
+			addMarker(this, data);
+		}
 	};
 	
 
@@ -870,7 +1253,7 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		return defaults;
 	}
 
-	$core.registerPlugin(plugin, "SRCrazy_EventMarkers", "1.0.0", "2019-05-26", true, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_EventMarkers", "2.0.0", "2019-06-01", true, "SRCrazy_Core");
 	$core.addPluginCommands(pluginCommander, ["EventMarkers"]);
 	
 	var _params = $core.parseParameters(plugin);
@@ -883,6 +1266,11 @@ SRCrazy.Plugins.EventMarkers = (function() {
 		"Opacity": "opacity",
 		"Hue": "hue"
 	});
+
+	var _defaultTweenVars = {};
+	if (!!_params["Enable Default Tween"]) {
+
+	}
 
 	return plugin;
 })();

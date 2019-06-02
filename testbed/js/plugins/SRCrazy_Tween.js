@@ -11,7 +11,7 @@
 
 /*:
  * @author S_Rank_Crazy
- * @plugindesc v1.0 Required for some SRCrazy plugins. Provides tweening functionality.
+ * @plugindesc v1.0.1 Required for some SRCrazy plugins. Provides tweening functionality.
  * <SRCrazy_Tween>
  * 
  * ============================================================================
@@ -70,7 +70,14 @@
  * 
  * 2) Fire-and-Forget
  * 
- * This is ashorthand for the above and uses the 
+ * This is a shorthand for the above and uses the SRCrazy_Timer plugin to update
+ * tweens over the Timer's framerate interval:
+ * 
+ * var targetObject = { x: 0, y: 0 };
+ * var SRCrazy.Classes.Tween.to(targetObject, 5, { x: 120 });
+ * tween.onCompleteCallback = function() {
+ *     console.log("My tween completed");
+ * };
  * 
  * ============================================================================
  * TERMS OF USE
@@ -93,7 +100,7 @@ SRCrazy.Classes.Tween = (function() {
 	var $core = SRCrazy.Plugins.Core;
 	var plugin = {};
 
-	$core.registerPlugin(plugin, "SRCrazy_Tween", "1.0", "2018-11-27", false, "SRCrazy_Core");
+	$core.registerPlugin(plugin, "SRCrazy_Tween", "1.0.1", "2019-06-02", false, "SRCrazy_Core");
 	
 	/**
 	 * Tween constructor
@@ -104,7 +111,7 @@ SRCrazy.Classes.Tween = (function() {
 	 */
 	function Tween(target, duration, easeFunc) {
 		this._target = target;
-		this._duration = number(duration);
+		this._duration = Number(duration);
 		this._easing = easeFunc;
 		
 		this._properties = {};
@@ -120,19 +127,18 @@ SRCrazy.Classes.Tween = (function() {
 	 * Commonly used tween completion behaviours
 	 */
 	Tween.CompleteBehaviour = {
-		oscillate: function(target) {
+		oscillate: function() {
 			this.start(!this.isBackwards);
 		},
-		repeat: function(target) {
+		repeat: function() {
 			this.start();
 		},
 		remove: function(target) {
+			this.destroy();
+
 			var realTarget = target.tweenContainer || target;
-			try {
+			if (realTarget.removeTween) {
 				realTarget.removeTween(this);
-				this.destroy();
-			} catch (e) {
-				console.error("SRCrazy_Tween.TweenCompleteBehaviour.remove FAILED\nTween target has no function such function 'removeTween'", realTarget);
 			}
 		}
 	};
@@ -185,6 +191,13 @@ SRCrazy.Classes.Tween = (function() {
 	$core.createGetter(_p, "progress", function() { return this._progress; });
 	
 	/**
+	 * Retrieves the Tween's progress (between 0-1).
+	 * 
+	 * @returns {number}
+	 */
+	$core.createGetter(_p, "duration", function() { return this._duration; });
+	
+	/**
 	 * Retrieves the Tween's target.
 	 * 
 	 * @returns {*}
@@ -195,8 +208,11 @@ SRCrazy.Classes.Tween = (function() {
 	 * Strips internal references to make sure it's garbage collected properly
 	 */
 	_p.destroy = function() {
-		for (var n in this._properties) {
-			this._properties[n].destroy();
+		var keys = Object.keys(this._properties);
+		var i = keys.length;
+		while (i-- > 0) {
+			var key = keys[i];
+			this._properties[key].destroy();
 		}
 		
 		this._properties = null;
@@ -212,11 +228,31 @@ SRCrazy.Classes.Tween = (function() {
 	 * @param {number} endValue The final value
 	 * @param {Function} [easeFunc] Function to use for easing, if none passed a linear ease function is used
 	 * @param {Function} [onUpdateCallback] Function to call when tween is updated
+	 * @memberof Tween
 	 */
 	_p.addProperty = function(name, startValue, endValue, easeFunc, onUpdateCallback) {
 		var prop = new TweenProperty(this._target, name, startValue, endValue, easeFunc || this._easing, onUpdateCallback);
 		this._properties[name] = prop;
 	};
+
+	/**
+	 * Removes a property from the Tween.
+	 * 
+	 * @param {string} name Name of the property on the target object
+	 * @param {*} [value] Sets a value for the property
+	 * @memberof Tween
+	 */
+	_p.removeProperty = function(name, value) {
+		var prop = this._properties[name];
+		if (prop) {
+			prop.detroy();
+			delete this._properties[name];
+
+			if (value != null) {
+				prop._target[prop._propertyName] = value;
+			}
+		}
+	}
 	
 	/**
 	 * Starts running Tween, sets properties to initial values.
@@ -235,7 +271,10 @@ SRCrazy.Classes.Tween = (function() {
 		this._isRunning = true;
 		this._runBackwards = backwards;
 		
-		for (var prop in this._properties) {
+		var keys = Object.keys(this._properties);
+		var i = keys.length;
+		while (i-- > 0) {
+			var prop = keys[i];
 			this._properties[prop].reset(backwards);
 		}
 		
@@ -289,7 +328,10 @@ SRCrazy.Classes.Tween = (function() {
 			finishedValue = 1;
 		}
 		
-		for (var prop in this._properties) {
+		var keys = Object.keys(this._properties);
+		var i = keys.length;
+		while (i-- > 0) {
+			var prop = keys[i];
 			this._properties[prop].update(scaledTime);
 		}
 		
@@ -322,13 +364,7 @@ SRCrazy.Classes.Tween = (function() {
 	 * Tween helper class. private.
 	 * @returns {TweenProperty}
 	 */
-	function TweenProperty() {
-		this.initialize.apply(this, arguments);
-	}
-	
-	var _p = $core.createClass(TweenProperty);
-	
-	_p.initialize = function(target, propertyName, start, end, easeFunc, onUpdateCallback) {
+	function TweenProperty(target, propertyName, start, end, easeFunc, onUpdateCallback) {
 		this._target = target;
 		this._propertyName = propertyName;
 		this._start = Number(start);
@@ -337,7 +373,9 @@ SRCrazy.Classes.Tween = (function() {
 		
 		this._ease = easeFunc || Tween.TweenEasing.linear;
 		this._onUpdateCallback = onUpdateCallback;
-	};
+	}
+	
+	var _p = $core.createClass(TweenProperty);
 	
 	/**
 	 * Strips internal references to make sure it's garbage collected properly
@@ -408,7 +446,7 @@ SRCrazy.Classes.Tween = (function() {
 		var Timer = SRCrazy.Classes.Timer;
 
 		if (!_timer) {
-			_timer = Timer.create(update.bind(this), Timer.frameRate, );
+			_timer = Timer.create(update.bind(this), Timer.frameRate);
 			_lastTimerUpdate = Date.now();
 		} else if (!_timer.isRunning) {
 			_timer.start();
@@ -420,13 +458,18 @@ SRCrazy.Classes.Tween = (function() {
 			removeTween(tween);
 		};
 
-		for (var prop in params) {
+		var keys = Object.keys(params);
+		var i = keys.length;
+		while (i-- > 0) {
+			var prop = keys[i];
 			if (prop !== "ease") {
 				tween.addProperty(prop, target[prop], params[prop]);
 			}
 		}
 
 		_tweens.push(tween);
+
+		return tween;
 	};
 
 	/**
@@ -437,7 +480,8 @@ SRCrazy.Classes.Tween = (function() {
 		var diff = timeNow - _lastTimerUpdate;
 		_lastTimerUpdate = timeNow;
 
-		for (var i = 0, l = _tweens.length; i < l; i++) {
+		var i = _tweens.length;
+		while (i-- > 0) {
 			_tweens[i].update(diff);
 		}
 	}
