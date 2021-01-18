@@ -17,7 +17,7 @@ glob.sync("./src/**/index.ts")
 	});
 
 module.exports = {
-    mode: "development",
+    mode: "production",
     devtool: "inline-source-map",
     entry: entryMap,
     output: {
