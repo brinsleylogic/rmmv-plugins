@@ -70,11 +70,12 @@ export default abstract class BasePlugin {
 	 * Registers a class with the global namespace.
 	 *
 	 * @protected
-	 * @param {IFunction} ctor Tthe class constructor.
+	 * @param {string} alias Alias for the class.
+	 * @param {IFunction} ctor The class constructor.
 	 * @memberof BasePlugin
 	 */
-	protected registerClass(ctor: IFunction): void {
-		SRCrazy[ctor.name] = ctor;
+	protected registerClass(alias: string, ctor: any): void {
+		SRCrazy[alias] = ctor;
 	}
 
 	/**
@@ -86,7 +87,7 @@ export default abstract class BasePlugin {
 	 * @returns {IFunction<T>}
 	 * @memberof BasePlugin
 	 */
-	protected getClass<T = any>(name: string): IFunction<T> {
+	protected getClass<T = any>(name: string): T {
 		return SRCrazy[name];
 	}
 

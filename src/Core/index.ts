@@ -2,7 +2,7 @@ import BasePlugin from "../BasePlugin";
 import IPlugin from "../IPlugin";
 
 /**
- *
+ * Plugin that provides some common functionality for other plugins.
  *
  * @export
  * @class Core
@@ -69,8 +69,9 @@ export default class Core extends BasePlugin implements IPlugin {
 	 * Registers a function that allows a plugin to listen for Plugin Commands.
 	 *
 	 * @param {IPluginCommand} handler The function to call when the command matches a supplied alias
-	 * @param {...string[]} names Array of aliases to use for the handler to be invoked
+	 * @param {...string[]} names Array of aliases to use for the handler to be invoked.
 	 * @returns {this}
+	 * @memberof Core
 	 */
 	public addPluginCommand(handler: IPluginCommand, ...names: string[]): this {
 		if (this._pluginCommands == null) {
@@ -86,12 +87,21 @@ export default class Core extends BasePlugin implements IPlugin {
 		return this;
 	}
 
-	public addSaveStateHandler(handler: ISaveStateHandler): void {
+	/**
+	 * Registers a component that reads/writes save data.
+	 *
+	 * @param {ISaveStateHandler} handler Component for managing save data.
+	 * @returns {this}
+	 * @memberof Core
+	 */
+	public addSaveStateHandler(handler: ISaveStateHandler): this {
 		if (this._saveStateHandlers) {
 			this._saveStateHandlers.push(handler);
 		} else {
 			this._saveStateHandlers = [handler];
 		}
+
+		return this;
 	}
 }
 
