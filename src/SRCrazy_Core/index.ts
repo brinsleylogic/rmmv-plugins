@@ -1,20 +1,51 @@
 import BasePlugin from "../BasePlugin";
 import IPlugin from "../IPlugin";
 
+(() => new CorePlugin())();
+
 /**
- * Plugin that provides some common functionality for other plugins.
+ * Describes accessible methods and members.
  *
  * @export
- * @class Core
+ * @interface Core
+ */
+export default interface Core {
+	/**
+	 * Registers a function that allows a plugin to listen for Plugin Commands.
+	 *
+	 * @param {IPluginCommand} handler The function to call when the command matches a supplied alias
+	 * @param {...string[]} names Array of aliases to use for the handler to be invoked.
+	 * @returns {this}
+	 * @memberof Core
+	 */
+	addPluginCommand(handler: IPluginCommand, ...names: string[]): this;
+
+	/**
+	 * Registers a component that reads/writes save data.
+	 *
+	 * @param {ISaveStateHandler} handler Component for managing save data.
+	 * @returns {this}
+	 * @memberof Core
+	 */
+	addSaveStateHandler(handler: ISaveStateHandler): this;
+}
+
+/**
+ * Plugin that contains helper methods for other plugins, handles common logic.
+ *
+ * @export
+ * @class CorePlugin
  * @extends {BasePlugin}
  * @implements {IPlugin}
  */
-export default class Core extends BasePlugin implements IPlugin {
+class CorePlugin extends BasePlugin implements IPlugin {
 	private _pluginCommands: { [name: string]: IPluginCommand };
 	private _saveStateHandlers: ISaveStateHandler[];
 
 	public constructor() {
-		super("Core", "2.1.0", "2020-01-18");
+		super("SRCrazy_Core", "2.1.0", "2020-01-18");
+
+		this.addToNamespace("Core", this);
 
 		const GameInterpreter_pluginCommand = Game_Interpreter.prototype.pluginCommand;
 		Game_Interpreter.prototype.pluginCommand = (command, args) => {
@@ -71,7 +102,7 @@ export default class Core extends BasePlugin implements IPlugin {
 	 * @param {IPluginCommand} handler The function to call when the command matches a supplied alias
 	 * @param {...string[]} names Array of aliases to use for the handler to be invoked.
 	 * @returns {this}
-	 * @memberof Core
+	 * @memberof CorePlugin
 	 */
 	public addPluginCommand(handler: IPluginCommand, ...names: string[]): this {
 		if (this._pluginCommands == null) {
@@ -92,7 +123,7 @@ export default class Core extends BasePlugin implements IPlugin {
 	 *
 	 * @param {ISaveStateHandler} handler Component for managing save data.
 	 * @returns {this}
-	 * @memberof Core
+	 * @memberof CorePlugin
 	 */
 	public addSaveStateHandler(handler: ISaveStateHandler): this {
 		if (this._saveStateHandlers) {

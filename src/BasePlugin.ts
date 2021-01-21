@@ -1,13 +1,6 @@
 import getTypedValue from "./utils/data/getTypedValue";
 import throwError from "./utils/throwError";
 
-/// <reference path="rmmv.d.ts" />
-
-declare var SRCrazy: IGlobal;
-SRCrazy = SRCrazy ?? {
-	plugins: {}
-};
-
 /**
  * Contains utility methods that should be accessible to all Plugins.
  *
@@ -34,7 +27,7 @@ export default abstract class BasePlugin {
 		})[0];
 
 		if (!meta) {
-			throwError(name, "Couldn't find pluginto register.", $plugins);
+			throwError(name, "Couldn't find plugin to register.", $plugins);
 			return;
 		}
 
@@ -63,31 +56,31 @@ export default abstract class BasePlugin {
 		SRCrazy.plugins[name] = {
 			version: version,
 			date: date
-		}
+		};
 	}
 
 	/**
-	 * Registers a class with the global namespace.
+	 * Registers an object/class with the global namespace.
 	 *
 	 * @protected
 	 * @param {string} alias Alias for the class.
-	 * @param {IFunction} ctor The class constructor.
+	 * @param {*} ctor The class constructor.
 	 * @memberof BasePlugin
 	 */
-	protected registerClass(alias: string, ctor: any): void {
+	protected addToNamespace(alias: string, ctor: any): void {
 		SRCrazy[alias] = ctor;
 	}
 
 	/**
-	 * Retrieves a class from the global namespace.
+	 * Retrieves an object/class from the global namespace.
 	 *
 	 * @protected
 	 * @template T
 	 * @param {string} name Name of the class.
-	 * @returns {IFunction<T>}
+	 * @returns {T}
 	 * @memberof BasePlugin
 	 */
-	protected getClass<T = any>(name: string): T {
+	protected getFromNamespace<T = any>(name: string): T {
 		return SRCrazy[name];
 	}
 
@@ -119,16 +112,18 @@ export default abstract class BasePlugin {
 /**
  * Defines the global namespace.
  *
- * @interface IGlobal
+ * @class GlobalNamespace
  */
-interface IGlobal {
+class GlobalNamespace {
 	/**
 	 * A list of registered plugins.
 	 *
 	 * @type {{ [name: string]: IPluginData }}
-	 * @memberof IGlobal
+	 * @memberof GlobalNamespace
 	 */
-	plugins: { [name: string]: IPluginData };
+	public plugins: { [name: string]: IPluginData } = {};
+
+	[name: string]: any;
 }
 
 /**
@@ -154,12 +149,7 @@ interface IPluginData {
 	date: string;
 }
 
-/**
- * Generic function signature.
- *
- * @interface IFunction
- * @template T
- */
-interface IFunction<T = any> {
-	(...args: any[]): T;
-}
+/// <reference path="rmmv.d.ts" />
+
+declare var SRCrazy: GlobalNamespace;
+SRCrazy = SRCrazy ?? new GlobalNamespace();
